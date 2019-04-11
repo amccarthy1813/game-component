@@ -14,25 +14,50 @@
 </head>
 <body>
 	<canvas id="GameCanvas"></canvas>
-	
+	<p id="ScoreAndMatch"></p>	
 	<script src="https://threejs.org/build/three.min.js"></script>
 	<script>
 		var renderer, camera, scene;
+		var canvasHeight = window.innerHeight - 100, canvasWidth = window.innerWidth;
 		var projector = new THREE.Projector();
-		var meshes, meshSpeed;
+		var meshes; //array of meshes
+		var meshSpeed; //array of mesh speeds on the z axis
+		var matchingMesh; //mesh to match for a point
 		var minCoord = -800, maxCoord = 800; //min and max x, y coordinates for assets
-		var mouse = {x: 0, y: 0};
-		
-		setUp();
-		addLights();
-		addAssets();
-		document.addEventListener('mousedown', onDocumentMouseDown, false);
-		
-		
-		requestAnimationFrame(render);
-		
+		var mouse = {x: 0, y: 0}; //mouse variable
+		var userScore = 0;
+		var endgame = false;
+		var pause = false;
+
+		var meshColors = [
+			0xff0000, //red
+			0x00ff00, //green
+			0x0000ff, //blue
+			0x00ffff, //cyan
+			0xffff00, //yellow
+			0xff00ff, //magenta
+			0xffaa00  //orange
+			];
+			
+		/* STARTER FUNCTIONS - 
+		 * These are the functions that start up the game. Pages using this code must 
+		 * call the init() function.
+		 */
+		// Initializer function
+		function init() {
+			setup();
+			addLights();
+			addAssets();
+			//listener for mouse click
+			document.addEventListener('mousedown', onDocumentMouseDown, false);
+			//listener for key presses
+			document.addEventListener('keypress', pauseGame, false);
+			//starts the rendering process
+			requestAnimationFrame(render);
+		}
+
 		//sets up camera, scene, and renderer
-		function setUp() {
+		function setup() {
 			renderer = new THREE.WebGLRenderer(
 			{
 				canvas: document.getElementById('GameCanvas'),
@@ -40,12 +65,12 @@
 			});
 			renderer.setClearColor(0x000000);
 			renderer.setPixelRatio(window.devicePixelRatio);
-			renderer.setSize(window.innerWidth, window.innerHeight);
+			renderer.setSize(canvasWidth, canvasHeight);
 			
-			camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 3000);
+			camera = new THREE.PerspectiveCamera(35, canvasWidth / canvasHeight, 0.1, 3000);
 			scene = new THREE.Scene();
 		}
-		
+
 		//adds lighting to the scene
 		function addLights() {
 			//ambient light source
@@ -56,7 +81,7 @@
 			var poiLight = new THREE.PointLight(0xffffff, 0.5);
 			scene.add(poiLight);
 		}
-		
+
 		//adds assets to the scene
 		function addAssets() {
 			var z = -3000;
@@ -64,25 +89,57 @@
 			meshes = new Array();
 			meshSpeed = new Array();
 			
+			//loop for creating the cubes
 			var i;
 			for(i = 0; i < 40; i++) {
 				geometry = new THREE.CubeGeometry(70, 70, 70);
-				material = new THREE.MeshLambertMaterial({color: '#'+Math.floor(Math.random()*16777215).toString(16)});
+				material = new THREE.MeshLambertMaterial({
+					color: meshColors[getRand(0, meshColors.length)],
+					transparent: true
+				});
 				mesh = new THREE.Mesh(geometry, material);
 				mesh.position.set(getRand(minCoord,maxCoord), getRand(minCoord,maxCoord), z);
 				meshes.push(mesh);
-				meshSpeed.push(getRand(5, 40))
+				meshSpeed.push(getRand(5, 40));
 				scene.add(mesh);
 			}
+			setMatchingMesh();
+			updateBanner();
 		}
-		
+
+		//function for doing the rendering
+		function render() {
+			for(i = 0; i < meshes.length; i++) {
+				if(meshes[i].position.z >= 0) {
+					meshPositionReset(meshes[i], i);
+				}
+				if(meshes[i].position.z < -2800) {
+					meshes[i].material.opacity += meshSpeed[i]/200;
+				}
+				
+				meshes[i].position.z += meshSpeed[i];
+				meshes[i].rotation.x += .01;
+				meshes[i].rotation.y += .003;
+			}
+			
+			renderer.render(scene, camera);
+			
+			if(!endgame) {
+				requestAnimationFrame(render);
+			}
+		}
+
+		/*EVENT LISTENER FUNCTIONS - 
+		 * functions called when mouse clicks and key presses happen
+		 */
+
 		//function for handling mouse events
 		function onDocumentMouseDown(event) {
 			console.log("Click.");
 			
 			//mouse coordinates
-			mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-			mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+			mouse.x = (event.clientX / canvasWidth) * 2 - 1;
+			mouse.y = -(event.clientY / canvasHeight) * 2 + 1;
 			
 			//ray casted
 			var vector = new THREE.Vector3(mouse.x, mouse.y, 1);
@@ -93,38 +150,84 @@
 				
 			var intersects = ray.intersectObjects(meshes);
 			if(intersects.length > 0) {
+				addToScore(intersects[0].object);
 				meshPositionReset(intersects[0].object, meshes.indexOf(intersects[0].object));
 			}
 		}
-		
-		//function for doing the rendering
-		function render() {
-			for(i = 0; i < meshes.length; i++) {
-				if(meshes[i].position.z >= 0) {
-					meshPositionReset(meshes[i], i);
-				}
-				
-				meshes[i].position.z += meshSpeed[i];
-				meshes[i].rotation.x += .01;
-				meshes[i].rotation.y += .003;
-			}
-			
-			renderer.render(scene, camera);
-			requestAnimationFrame(render);
+
+		//sends an alert to stop animation, which pauses the game.
+		function pauseGame(event) {
+			alert("Paused! Press OK to resume.");
 		}
-		
+
+		/*OTHER FUNCTIONS - 
+		 *other essential functions.
+		 */
+
+		//function for adding to a user's score
+		function addToScore(targetMesh) {
+			var targetColor = targetMesh.material.color.getHex();
+			var matchingColor = matchingMesh.material.color.getHex();
+			
+			if(targetColor === matchingColor) {
+				userScore++;
+				setMatchingMesh();
+				updateBanner();
+			} else {
+				endgame = true;
+			}
+		}
+
 		//resets a mesh's position
 		function meshPositionReset(mesh, meshSpeedIndex) {
+			mesh.material.opacity = 0;
 			mesh.position.z = -3000;
 			mesh.position.x = getRand(minCoord,maxCoord);
 			mesh.position.y = getRand(minCoord,maxCoord);
 			meshSpeed[meshSpeedIndex] = getRand(5, 40);
 		}
-		
+
 		//gets a random integer between some minimum and maximum value
 		function getRand(min, max) {
 			return Math.floor(Math.random() * (max - min) ) + min;
 		}
+
+		//set the matching mesh color
+		function setMatchingMesh() {
+			matchingMesh = meshes[getRand(0, meshes.length - 1)];
+		}
+
+		//update the match and score banner
+		function updateBanner() {
+			var score = "Current Score: " + userScore;
+			var match = "Match with: " + getColorName(matchingMesh.material.color.getHex());
+			document.getElementById('ScoreAndMatch').innerHTML = score + " " + match;
+		}
+
+		//get a string for the name of a color, given as a decimal
+		function getColorName(hexColor) {
+			switch(hexColor) {
+				case 16711680:
+					return "red";
+				case 65280:
+					return "green";
+				case 255:
+					return "blue";
+				case 65535:
+					return "cyan";
+				case 16776960:
+					return "yellow";
+				case 16711935:
+					return "magenta";
+				case 16755200:
+					return "orange";
+				default:
+					return "default";
+			}
+		}
+	</script>
+	<script>
+		init();
 	</script>
 </body>
 </html>
