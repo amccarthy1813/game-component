@@ -7,9 +7,12 @@
 		body {
 			margin: 0;
 			overflow: auto;
+			background-color: black;
 		}
 		canvas {
 			background: black;
+			width = 100%;
+			height = 100%;
 		}
 		#score {
 			position: fixed;
@@ -28,6 +31,34 @@
 			font-size: 30px;
 			color: white;
 		}
+		
+		#gameOver {
+			position: fixed;
+			width: 100%;
+			text-align: center;
+			top: 30%;
+			font-family: 'Exo', sans-serif;
+			font-size: 60px;
+			color: red;
+		}
+		#reset {
+			position: fixed;
+			width: 100%;
+			text-align: center;
+			top: 45%;
+			font-family: 'Exo', sans-serif;
+			font-size: 30px;
+			color: blue;
+		}
+		#toScoreboard {
+			position: fixed;
+			width: 100%;
+			text-align: center;
+			top: 60%;
+			font-family: 'Exo', sans-serif;
+			font-size: 30px;
+			color: blue;
+		}
 	</style>
 </head>
 <body>
@@ -35,6 +66,9 @@
 	<canvas id="GameCanvas"></canvas>
 	<div id="score"></div>
 	<div id="match"></div>
+	<div id="gameOver"></div>
+	<div id="reset" onClick="window.location.reload()"></div>
+	<div id="toScoreboard"></div>
 	
 	<script src="https://threejs.org/build/three.min.js"></script>
 	<script>
@@ -49,6 +83,7 @@
 		var userScore = 0;
 		var endgame = false;
 		var pause = false;
+		var runGameOver = true;
 
 		var meshColors = [
 			0xff0000, //red
@@ -69,14 +104,20 @@
 			setup();
 			addLights();
 			addAssets();
+			addEventListeners();
+			requestAnimationFrame(render); //starts the rendering process
+		}
+
+		//adds the document's event listeners
+		function addEventListeners() {
 			//listener for mouse click
 			document.addEventListener('mousedown', onDocumentMouseDown, false);
 			//listener for touch 
 			document.addEventListener('touchstart', onDocumentMouseDown, false);
+			//listener for window resizing
+			window.onresize = onWindowResize;
 			//listener for key presses
 			document.addEventListener('keypress', pauseGame, false);
-			//starts the rendering process
-			requestAnimationFrame(render);
 		}
 
 		//sets up camera, scene, and renderer
@@ -153,6 +194,11 @@
 			}
 			
 			if(endgame) {
+				if(runGameOver) {
+					gameOver();
+					runGameOver = false;
+				}
+				
 				for(i = 0; i < meshes.length; i++) {
 					if(meshes[i].material.opacity > 0) {
 						meshes[i].material.opacity -=.01;
@@ -187,6 +233,22 @@
 				addToScore(intersects[0].object);
 				meshPositionReset(intersects[0].object, meshes.indexOf(intersects[0].object));
 			}
+		}
+
+		//function for handling resizing the window
+		function onWindowResize() {
+			//need to update the canvasWidth and canvasHeight variables
+			canvasWidth = window.innerWidth;
+			canvasHeight = window.innerHeight;
+			
+			//resetting the canvas for new window size
+			document.getElementById('GameCanvas').width = canvasWidth;
+			document.getElementById('GameCanvas').height = canvasHeight;
+			
+			//resetting the camera and renderer for new window size
+			camera.aspect = canvasWidth / canvasHeight;
+			camera.updateProjectionMatrix();
+			renderer.setSize(canvasWidth, canvasHeight);
 		}
 
 		//sends an alert to stop animation, which pauses the game.
@@ -231,7 +293,6 @@
 
 		//the next two functions limit the areas where blocks can fly; 
 		//no more straight into the camera!!
-
 		//gets an x between minX and maxCoord, or minCoord and maxX
 		function getMeshPositionX() {
 			var minX = 100;
@@ -275,6 +336,13 @@
 			document.getElementById('match').innerHTML = match;
 		}
 
+		//sets up the game over sequence
+		function gameOver() {
+			document.getElementById('gameOver').innerHTML = "GAME OVER";
+			document.getElementById('reset').innerHTML = "New Game";
+			document.getElementById('toScoreboard').innerHTML = "View Scoreboard";
+		}
+
 		//get a string for the name of a color, given as a decimal
 		function getColorName(hexColor) {
 			switch(hexColor) {
@@ -296,6 +364,7 @@
 					return "default";
 			}
 		}
+
 	</script>
 	<script>
 		init();
