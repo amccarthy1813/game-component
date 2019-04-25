@@ -1,24 +1,45 @@
 <html>
 <head>
-	<title>Game Example</title>
+	<title>Game Example</title>	
 	<style>
+		@import url('https://fonts.googleapis.com/css?family=Exo');
+		
 		body {
 			margin: 0;
-			overflow: hidden;
+			overflow: auto;
 		}
 		canvas {
 			background: black;
 		}
-		
+		#score {
+			position: fixed;
+			top: 2%;
+			left: 2%;
+			font-family: 'Exo', sans-serif;
+			font-size: 30px;
+			color: white;
+			
+		}
+		#match {
+			position: fixed;
+			top: 2%;
+			right: 2%;
+			font-family: 'Exo', sans-serif;
+			font-size: 30px;
+			color: white;
+		}
 	</style>
 </head>
 <body>
+	
 	<canvas id="GameCanvas"></canvas>
-	<p id="ScoreAndMatch"></p>	
+	<div id="score"></div>
+	<div id="match"></div>
+	
 	<script src="https://threejs.org/build/three.min.js"></script>
 	<script>
 		var renderer, camera, scene;
-		var canvasHeight = window.innerHeight - 100, canvasWidth = window.innerWidth;
+		var canvasHeight = window.innerHeight, canvasWidth = window.innerWidth;
 		var projector = new THREE.Projector();
 		var meshes; //array of meshes
 		var meshSpeed; //array of mesh speeds on the z axis
@@ -36,7 +57,7 @@
 			0x00ffff, //cyan
 			0xffff00, //yellow
 			0xff00ff, //magenta
-			0xffaa00  //orange
+			0xe57f0b  //orange
 			];
 			
 		/* STARTER FUNCTIONS - 
@@ -50,6 +71,8 @@
 			addAssets();
 			//listener for mouse click
 			document.addEventListener('mousedown', onDocumentMouseDown, false);
+			//listener for touch 
+			document.addEventListener('touchstart', onDocumentMouseDown, false);
 			//listener for key presses
 			document.addEventListener('keypress', pauseGame, false);
 			//starts the rendering process
@@ -74,11 +97,11 @@
 		//adds lighting to the scene
 		function addLights() {
 			//ambient light source
-			var ambLight = new THREE.AmbientLight(0xffffff, 0.5);
-			scene.add(ambLight);
+			//var ambLight = new THREE.AmbientLight(0xffffff, 0.5);
+			//scene.add(ambLight);
 			
 			//point light source
-			var poiLight = new THREE.PointLight(0xffffff, 0.5);
+			var poiLight = new THREE.PointLight(0xffffff, 1.5);
 			scene.add(poiLight);
 		}
 
@@ -86,6 +109,7 @@
 		function addAssets() {
 			var z = -3000;
 			var geometry, material, mesh;
+			var meshColor;
 			meshes = new Array();
 			meshSpeed = new Array();
 			
@@ -93,14 +117,18 @@
 			var i;
 			for(i = 0; i < 40; i++) {
 				geometry = new THREE.CubeGeometry(70, 70, 70);
-				material = new THREE.MeshLambertMaterial({
-					color: meshColors[getRand(0, meshColors.length)],
-					transparent: true
+				meshColor = meshColors[getRand(0, meshColors.length)];
+				material = new THREE.MeshPhongMaterial({
+					color: meshColor,
+					//emissive: meshColor,
+					//emissiveIntensity: 1,
+					transparent: true,
+					shininess: 1
 				});
 				mesh = new THREE.Mesh(geometry, material);
-				mesh.position.set(getRand(minCoord,maxCoord), getRand(minCoord,maxCoord), z);
+				mesh.position.set(getMeshPositionX(), getMeshPositionY(), z);
 				meshes.push(mesh);
-				meshSpeed.push(getRand(5, 40));
+				meshSpeed.push(getMeshSpeed(mesh.position.x, mesh.position.y));
 				scene.add(mesh);
 			}
 			setMatchingMesh();
@@ -109,24 +137,30 @@
 
 		//function for doing the rendering
 		function render() {
-			for(i = 0; i < meshes.length; i++) {
-				if(meshes[i].position.z >= 0) {
-					meshPositionReset(meshes[i], i);
+			if(!endgame){
+				for(i = 0; i < meshes.length; i++) {
+					if(meshes[i].position.z >= 0) {
+						meshPositionReset(meshes[i], i);
+					}
+					if(meshes[i].position.z < -2800) {
+						meshes[i].material.opacity += meshSpeed[i]/200;
+					}
+					
+					meshes[i].position.z += meshSpeed[i];
+					meshes[i].rotation.x += .01;
+					meshes[i].rotation.y += .003;
 				}
-				if(meshes[i].position.z < -2800) {
-					meshes[i].material.opacity += meshSpeed[i]/200;
-				}
-				
-				meshes[i].position.z += meshSpeed[i];
-				meshes[i].rotation.x += .01;
-				meshes[i].rotation.y += .003;
 			}
 			
+			if(endgame) {
+				for(i = 0; i < meshes.length; i++) {
+					if(meshes[i].material.opacity > 0) {
+						meshes[i].material.opacity -=.01;
+					}
+				}
+			}
 			renderer.render(scene, camera);
-			
-			if(!endgame) {
-				requestAnimationFrame(render);
-			}
+			requestAnimationFrame(render);
 		}
 
 		/*EVENT LISTENER FUNCTIONS - 
@@ -182,9 +216,44 @@
 		function meshPositionReset(mesh, meshSpeedIndex) {
 			mesh.material.opacity = 0;
 			mesh.position.z = -3000;
-			mesh.position.x = getRand(minCoord,maxCoord);
-			mesh.position.y = getRand(minCoord,maxCoord);
-			meshSpeed[meshSpeedIndex] = getRand(5, 40);
+			mesh.position.x = getMeshPositionX();
+			mesh.position.y = getMeshPositionY();
+			//meshSpeed[meshSpeedIndex] = getRand(5, 40);
+			meshSpeed[meshSpeedIndex] = getMeshSpeed(mesh.position.x, mesh.position.y);
+		}
+
+		//finds a mesh's speed based on distance from the origin (usful for depth)
+		function getMeshSpeed(x, y) {
+			var distanceToOrigin = Math.sqrt((x*x) + (y*y));
+			var speed = distanceToOrigin/20;
+			return speed;
+		}
+
+		//the next two functions limit the areas where blocks can fly; 
+		//no more straight into the camera!!
+
+		//gets an x between minX and maxCoord, or minCoord and maxX
+		function getMeshPositionX() {
+			var minX = 100;
+			var maxX = -100;
+			var quadrant = Math.random();
+			if(quadrant >= 0.5)
+				return getRand(minX, maxCoord);
+			
+			//else
+			return getRand(minCoord, maxX);
+		}
+
+		//gets a y between minY and maxCoord, or minCoord and maxY
+		function getMeshPositionY() {
+			var minY = 100;
+			var maxY = -100;
+			var quadrant = Math.random();
+			if(quadrant >= 0.5)
+				return getRand(minY, maxCoord);
+			
+			//else
+			return getRand(minCoord, maxY);
 		}
 
 		//gets a random integer between some minimum and maximum value
@@ -201,7 +270,9 @@
 		function updateBanner() {
 			var score = "Current Score: " + userScore;
 			var match = "Match with: " + getColorName(matchingMesh.material.color.getHex());
-			document.getElementById('ScoreAndMatch').innerHTML = score + " " + match;
+			//document.getElementById('ScoreAndMatch').innerHTML = score + " " + match;
+			document.getElementById('score').innerHTML = score;
+			document.getElementById('match').innerHTML = match;
 		}
 
 		//get a string for the name of a color, given as a decimal
@@ -219,7 +290,7 @@
 					return "yellow";
 				case 16711935:
 					return "magenta";
-				case 16755200:
+				case 15040267:
 					return "orange";
 				default:
 					return "default";
