@@ -1,6 +1,6 @@
 <?php
 //get the current score
-$currentScore = intval($_POST['score']);
+$currentScore = intval($_POST["score"]);
 
 //start session
 session_start();
