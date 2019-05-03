@@ -1,6 +1,6 @@
 <html>
 <head>
-	<title>Game Example</title>	
+	<title>MIBGa</title>	
 	<style>
 		@import url('https://fonts.googleapis.com/css?family=Exo');
 		
@@ -71,6 +71,7 @@
 	<div id="toScoreboard" onClick="location.href = 'Leaderboard.php';"></div>
 	
 	<script src="https://threejs.org/build/three.min.js"></script>
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.2/jquery.min.js"></script>
 	<script>
 		var renderer, camera, scene;
 		var canvasHeight = window.innerHeight, canvasWidth = window.innerWidth;
@@ -338,11 +339,37 @@
 
 		//sets up the game over sequence
 		function gameOver() {
+			sendScore();
 			document.getElementById('gameOver').innerHTML = "GAME OVER";
 			document.getElementById('reset').innerHTML = "New Game";
 			document.getElementById('toScoreboard').innerHTML = "View Scoreboard";
 		}
-
+		
+		//sends the user's score to the server for validation
+		function sendScore() {
+			var scoreForm = document.createElement("form");
+			var scoreData = document.createElement("input");
+			scoreData.setAttribute('type', "text");
+			scoreData.setAttribute('value', userScore);
+			scoreForm.appendChild(scoreData);
+			
+			//this is a somewhat standard way of sending form data with js to 
+			//php; however I took the following code from here: 
+			//https://forums.digitalpoint.com/threads/how-to-submit-a-form-without-rerload-or-redirect-the-page.2151997/
+			
+			$(document).ready(function() {
+				$('form').submit(function() {
+					var formdata = $(this).serialize();
+					$.ajax({
+						type: "POST",
+						url: "updateScore.php",
+						data: formdata
+					 });
+					return false;
+				});
+			});
+		}
+		
 		//get a string for the name of a color, given as a decimal
 		function getColorName(hexColor) {
 			switch(hexColor) {
