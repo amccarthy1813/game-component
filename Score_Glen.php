@@ -3,6 +3,9 @@
 <body>
 
 <?php
+session_start();
+echo "<br>" . $_SESSION['username'] . "<br>";
+	
 $servername = "localhost";
 $username = "MIBGa_DB_admin";
 $password = "PenguinPie";
@@ -10,7 +13,7 @@ $dbname = "MIBGa_DB";
 
 //These variables will need to be passed from the game
 $gameScore = 10;
-$currentUser = 'glen';
+$currentUser = $_SESSION['username'];
 
 // Create connection
 $conn = new mysqli($servername, $username, $password, $dbname);
@@ -30,6 +33,7 @@ if ($result->num_rows > 0) {
 		
 		//compare the game score against the original score
 	if ($row["score"] < $gameScore){
+		
 		echo "<br> Game Score: ". $gameScore. "<br>";
 		
 		// Attempt insert query execution
