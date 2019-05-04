@@ -20,7 +20,7 @@ $previousScore = intval(mysqli_query($db, $getQuery));
 if($currentScore > $previousScore) {
 	$setQuery = "UPDATE users SET score = $currentScore 
 		WHERE username = $user";
-	mysqli_query($db, $setQuery)
+	mysqli_query($db, $setQuery);
 }
 
 ?>
