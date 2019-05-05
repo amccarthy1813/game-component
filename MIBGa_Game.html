@@ -62,16 +62,47 @@
 	</style>
 </head>
 <body>
-	
+	<form id="scoreForm" method="POST" action="Score_Glen.php">
+		<input name="score" id="scoreData" type="text" />
+		<button type="submit" id="formButton" value="Submit"></button>
+	</form>
+	<script>
+	//this will asynchronously send the score to the database 
+	window.addEventListener("load", function() {
+		function sendForm() {
+			var httpReq = new XMLHttpRequest();
+			var formData = new FormData(form);
+			
+			httpReq.addEventListener("load", function(event) {
+				alert("It worked!!");
+			});
+			
+			httpReq.addEventListener("error", function(event) {
+				alert('Something went very wrong...');
+			});
+			
+			httpReq.open("POST", "Score_Glen.php");
+			
+			httpReq.send(formData);
+		}
+		
+		var form = document.getElementById("scoreForm");
+		form.addEventListener("submit", function(event) {
+			event.preventDefault();
+			
+			sendForm();
+		});
+	});
+	</script>
 	<canvas id="GameCanvas"></canvas>
 	<div id="score"></div>
 	<div id="match"></div>
 	<div id="gameOver"></div>
 	<div id="reset" onClick="window.location.reload()"></div>
 	<div id="toScoreboard" onClick="location.href = 'Leaderboard.php';"></div>
+		
 	
 	<script src="https://threejs.org/build/three.min.js"></script>
-	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.2/jquery.min.js"></script>
 	<script>
 		var renderer, camera, scene;
 		var canvasHeight = window.innerHeight, canvasWidth = window.innerWidth;
@@ -347,28 +378,14 @@
 		
 		//sends the user's score to the server for validation
 		function sendScore() {
-			var scoreForm = document.createElement("form");
-			var scoreData = document.createElement("input");
-			scoreData.setAttribute('type', "text");
-			scoreData.setAttribute('name', "score");
-			scoreData.setAttribute('value', userScore);
-			scoreForm.appendChild(scoreData);
-			
-			//this is a somewhat standard way of sending form data with js to 
-			//php; however I took the following code from here: 
-			//https://forums.digitalpoint.com/threads/how-to-submit-a-form-without-rerload-or-redirect-the-page.2151997/
-			
-			$(document).ready(function() {
-				$('form').submit(function() {
-					var formdata = $(this).serialize();
-					$.ajax({
-						type: "POST",
-						url: "updateScore.php",
-						data: formdata
-					 });
-					return false;
-				});
+			document.getElementById("scoreData").setAttribute('value', userScore);
+			var event = new MouseEvent('click', {
+				view: window,
+				bubbles: true,
+				cancelable: true			
 			});
+			
+			document.getElementById('formButton').dispatchEvent(event);
 		}
 		
 		//get a string for the name of a color, given as a decimal
