@@ -12,7 +12,7 @@ $password = "PenguinPie";
 $dbname = "MIBGa_DB";
 
 //These variables will need to be passed from the game
-$gameScore = 10;
+$gameScore = $_POST["score"];
 $currentUser = $_SESSION['username'];
 
 // Create connection
