@@ -1,0 +1,474 @@
+<html>
+<head>
+	<title>Game</title>	
+	<style>
+		@import url('https://fonts.googleapis.com/css?family=Exo');
+		
+		body {
+			margin: 0;
+			overflow: auto;
+			background-color: black;
+		}
+		canvas {
+			background: black;
+			width: 100%;
+			height: 100%;
+			cursor: crosshair;
+		}
+		#scoreForm {
+			visibility: hidden;
+			position: fixed;
+			top: 50%;
+			left: 50%;
+		}
+		#scoreData {
+			visibility: hidden;
+		}
+		#formButton {
+			visibility: hidden;
+		}
+		#score {
+			position: fixed;
+			top: 2%;
+			left: 2%;
+			font-family: 'Exo', sans-serif;
+			font-size: 30px;
+			color: white;			
+		}
+		#match {
+			position: fixed;
+			top: 2%;
+			right: 2%;
+			font-family: 'Exo', sans-serif;
+			font-size: 30px;
+			color: white;
+		}
+		
+		#gameOver {
+			position: fixed;
+			width: 100%;
+			text-align: center;
+			top: 30%;
+			font-family: 'Exo', sans-serif;
+			font-size: 500%;
+			color: red;
+			cursor: crosshair;
+		}
+		#reset {
+			position: fixed;
+			width: 100%;
+			text-align: center;
+			top: 45%;
+			font-family: 'Exo', sans-serif;
+			font-size: 250%;
+			color: blue;
+			cursor: pointer;
+		}
+		#toScoreboard {
+			position: fixed;
+			width: 100%;
+			text-align: center;
+			top: 60%;
+			font-family: 'Exo', sans-serif;
+			font-size: 250%;
+			color: blue;
+			cursor: pointer;
+		}
+	</style>
+</head>
+<body>
+	<form id="scoreForm" method="POST" action="Score_Glen.php">
+		<input name="score" id="scoreData" type="text" />
+		<button type="submit" id="formButton" value="Submit"></button>
+	</form>
+	<canvas id="GameCanvas"></canvas>
+	<div id="score"></div>
+	<div id="match"></div>
+	<div id="gameOver"></div>
+	<div id="reset" onClick="window.location.reload()"></div>
+	<div id="toScoreboard" onClick="location.href = 'Leaderboard.php';"></div>
+	
+	<script src="https://threejs.org/build/three.min.js"></script>
+	<script>
+		var renderer, camera, scene, frame;
+		var canvasHeight = window.innerHeight, canvasWidth = window.innerWidth;
+		var meshes = []; //array of meshes
+		var meshSpeed = []; //array of mesh speeds on the z axis
+		var matchingMesh; //mesh to match for a point
+		var minCoord = -800, maxCoord = 800; //min and max x, y coordinates for meshes
+		var mouse = {x: 0, y: 0}; //mouse variable
+		var userScore = 0;
+		var endgame = false; //boolean for the end of the game
+		var pause = false; //boolean for pausing the game
+		var runGameOver = true; //boolean for running the gameOver() function
+
+		//array of mesh colors; RGB, CYM, and Orange
+		var meshColors = [
+			0xff0000, //red
+			0x00ff00, //green
+			0x0000ff, //blue
+			0x00ffff, //cyan
+			0xffff00, //yellow
+			0xff00ff, //magenta
+			0xe57f0b  //orange
+			];
+			
+		/* STARTER FUNCTIONS - 
+		 * These are the functions that start up the game. Pages using this code must 
+		 * call the init() function.
+		 */
+		// Initializer function
+		function init() {
+			setupCanvas();
+			addLights();
+			addAssets();
+			addEventListeners();
+			requestAnimationFrame(render); //starts the rendering process
+		}
+
+		//sets up camera, scene, and renderer
+		function setupCanvas() {
+			renderer = new THREE.WebGLRenderer(
+			{
+				canvas: document.getElementById('GameCanvas'),
+				antialias: true
+			});
+			renderer.setClearColor(0x000000);
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(canvasWidth, canvasHeight);
+			
+			camera = new THREE.PerspectiveCamera(35, canvasWidth / canvasHeight, 0.1, 3000);
+			scene = new THREE.Scene();
+		}
+
+		//adds lighting to the scene
+		function addLights() {	
+			//point light source
+			var poiLight = new THREE.PointLight(0xffffff, 1.5);
+			scene.add(poiLight);
+		}
+
+		//adds assets to the scene
+		function addAssets() {
+			var z = -3000; //default z position of all meshes in the scene
+			//geometry for cubes
+			var geometry = new THREE.CubeGeometry(70, 70, 70);
+			var material; //material for cubes
+			var mesh; //mesh object
+			var meshColor; //meshColor
+			
+			//loop for creating the cubes
+			for(let i = 0; i < 40; i++) {
+				//get a random color
+				meshColor = meshColors[getRand(0, meshColors.length)];
+				//creates a new material for each mesh
+				material = new THREE.MeshPhongMaterial({
+					color: meshColor,
+					transparent: true,
+					shininess: 1
+				});
+				//create a new mesh
+				mesh = new THREE.Mesh(geometry, material);
+				//set the initial position
+				mesh.position.set(getMeshPositionX(), getMeshPositionY(), z);
+				//add the mesh to the meshes array
+				meshes.push(mesh);
+				//set the initial speed of the mesh, and add it to the meshSpeed array
+				meshSpeed.push(setMeshSpeed(mesh.position.x, mesh.position.y));
+				//add the mesh to the scene
+				scene.add(mesh);
+			}
+			setMatchingMesh();
+			updateBanner();
+		}
+
+		//adds the document's event listeners
+		function addEventListeners() {
+			//listener for mouse click
+			document.addEventListener('mousedown', onDocumentMouseDown, false);
+			//listener for touch 
+			document.addEventListener('touchstart', onDocumentMouseDown, false);
+			//listener for window resizing
+			window.onresize = onWindowResize;
+			//listener for key presses
+			document.addEventListener('keypress', pauseGame, false);
+			//listener for web form submission
+			window.addEventListener("load", sendForm);
+		}
+
+		//function for doing the rendering. Called recursively. 
+		function render() {
+			if(!endgame){
+				for(i = 0; i < meshes.length; i++) {
+					//resets mesh position if it is past the camera
+					if(meshes[i].position.z >= 0) {
+						meshPositionReset(meshes[i], i);
+					}
+					//fades in the mesh between -3000 and -2800
+					if(meshes[i].position.z < -2800) {
+						meshes[i].material.opacity += meshSpeed[i]/200;
+					}
+					//sets the postion of the mesh based on the speed
+					meshes[i].position.z += meshSpeed[i];
+					meshes[i].rotation.x += .01;
+					meshes[i].rotation.y += .003;
+				}
+			}
+			
+			if(endgame) {
+				//checks if the gameOver function has already been called
+				if(runGameOver) {
+					gameOver();
+					runGameOver = false;
+				}
+				
+				//fades out all cubes on screen, as an end sequence
+				for(i = 0; i < meshes.length; i++) {
+					//changes the opacity
+					if(meshes[i].material.opacity > 0) {
+						meshes[i].material.opacity -=.01;
+					}
+				}
+			}
+			//checks if the game is paused
+			if(!pause) {
+				renderer.render(scene, camera);
+				frame = requestAnimationFrame(render);
+			}
+		}
+
+		/*EVENT LISTENER FUNCTIONS - 
+		 * functions called for various events
+		 */
+		//function for handling mouse events
+		function onDocumentMouseDown(event) {
+			//mouse coordinates
+			mouse.x = (event.clientX / canvasWidth) * 2 - 1;
+			mouse.y = -(event.clientY / canvasHeight) * 2 + 1;
+			
+			//ray casted
+			var vector = new THREE.Vector3(mouse.x, mouse.y, 1);
+			vector.unproject(camera);
+			var ray = new THREE.Raycaster(camera.position, 
+				vector.sub(camera.position).normalize());
+			
+			//checking for collisions between the ray and meshes in the scene
+			var intersects = ray.intersectObjects(meshes);
+			if(intersects.length > 0) {
+				addToScore(intersects[0].object);
+				meshPositionReset(intersects[0].object, meshes.indexOf(intersects[0].object));
+			}
+		}
+
+		//function for handling resizing the window
+		function onWindowResize() {
+			//need to update the canvasWidth and canvasHeight variables
+			canvasWidth = window.innerWidth;
+			canvasHeight = window.innerHeight;
+			
+			//resetting the canvas for new window size
+			document.getElementById('GameCanvas').width = canvasWidth;
+			document.getElementById('GameCanvas').height = canvasHeight;
+			
+			//resetting the camera and renderer for new window size
+			camera.aspect = canvasWidth / canvasHeight;
+			camera.updateProjectionMatrix();
+			renderer.setSize(canvasWidth, canvasHeight);
+		}
+
+		//pauses the game, and allows either continuing or ending the game
+		function pauseGame(event) {
+			pause = true;
+			if(confirm("Paused! Press OK to continue, or Cancel to end the game.")) {
+				pause = false;
+				cancelAnimationFrame(frame);
+				requestAnimationFrame(render);
+			} else {
+				pause = false;
+				endgame = true;
+				requestAnimationFrame(render);
+			}
+		}
+		
+		//this will asynchronously send the score to the database 
+		function sendForm() {
+			var form = document.getElementById("scoreForm");
+			
+			form.addEventListener("submit", function(event) {
+				event.preventDefault();
+				
+				sendForm();
+			});
+			
+			function sendForm() {
+				var httpReq = new XMLHttpRequest();
+				var formData = new FormData(form);
+				
+				httpReq.addEventListener("load", function(event) {
+					alert("Score data sent.");
+				});
+				
+				httpReq.addEventListener("error", function(event) {
+					alert('Score data not sent!');
+				});
+				
+				httpReq.open("POST", "Score_Glen.php");
+				httpReq.send(formData);
+			}
+		}
+		
+		/*SCORE FUNCTIONS - 
+		 *Functions related to scoring.
+		 */
+		//function for adding to a user's score
+		function addToScore(targetMesh) {
+			//the current mesh's color
+			var targetColor = targetMesh.material.color.getHex();
+			//the color to match
+			var matchingColor = matchingMesh.material.color.getHex();
+			
+			if(targetColor === matchingColor) {
+				userScore++;
+				setMatchingMesh();
+				updateBanner();
+			} else {
+				endgame = true;
+			}
+		}
+
+		//sends the user's score to the server for validation
+		function sendScore() {
+			document.getElementById("scoreData").setAttribute('value', userScore);
+			//creating a click event for the web form, otherwise an onSend event 
+			//WILL NOT fire
+			var event = new MouseEvent('click', {
+				view: window,
+				bubbles: true,
+				cancelable: true			
+			});
+			
+			//dispatches the click event, with then dispaches the onSend event
+			document.getElementById('formButton').dispatchEvent(event);
+		}
+
+		/*HTML PAGE FUNCTIONS - 
+		 *These functions affect HTML elements on the page, except for the the canvas 
+		 *element.
+		 */
+		 //sets up the game over sequence
+		function gameOver() {
+			sendScore();
+			document.getElementById('gameOver').innerHTML = "GAME OVER";
+			document.getElementById('reset').innerHTML = "New Game";
+			document.getElementById('toScoreboard').innerHTML = "View Scoreboard";
+		}
+
+		//update the match and score banner
+		function updateBanner() {
+			var score = "Current Score: " + userScore;
+			var match = "Match with: " + getColorName(matchingMesh.material.color.getHex());
+			document.getElementById('score').innerHTML = score;
+			document.getElementById('match').innerHTML = match;
+		}
+
+		/*MESH RELATED FUNCTIONS - 
+		 *These are functions related to the mesh objects, such as setting speed, 
+		 *position, and the game's matching mesh
+		 */
+
+		//resets a mesh's position
+		function meshPositionReset(mesh, meshSpeedIndex) {
+			//mesh is the mesh objec to reset, 
+			//meshSpeedIndex is the index of the mesh in the meshSpeed array variable
+			mesh.material.opacity = 0;
+			mesh.position.z = -3000;
+			mesh.position.x = getMeshPositionX();
+			mesh.position.y = getMeshPositionY();
+			meshSpeed[meshSpeedIndex] = setMeshSpeed(mesh.position.x, mesh.position.y);
+		}
+
+		//sets a mesh's speed based on distance from the origin
+		function setMeshSpeed(x, y) {
+			//standard distance formula between a point and the origin (0,0)
+			var distanceToOrigin = Math.sqrt((x*x) + (y*y));
+			var speed = distanceToOrigin/20; //slows mesh speed
+			return speed;
+		}
+
+		//the next two functions keep the blocks from flying straight into the camera
+
+		//gets an x between minX and maxCoord, or minCoord and maxX
+		function getMeshPositionX() {
+			var minX = 100;
+			var maxX = -100;
+			var quadrant = Math.random();
+			if(quadrant >= 0.5)
+				return getRand(minX, maxCoord);
+			
+			//else
+			return getRand(minCoord, maxX);
+		}
+
+		//gets a y between minY and maxCoord, or minCoord and maxY
+		function getMeshPositionY() {
+			var minY = 100;
+			var maxY = -100;
+			var quadrant = Math.random();
+			if(quadrant >= 0.5)
+				return getRand(minY, maxCoord);
+			
+			//else
+			return getRand(minCoord, maxY);
+		}
+
+		//set the matching mesh color
+		function setMatchingMesh() {
+			matchingMesh = meshes[getRand(0, meshes.length - 1)];
+		}
+
+		/*OTHER FUNCTIONS - 
+		 *These are other miscellaneous functions needed for the game
+		 */
+		//gets a random integer between some minimum and maximum value
+		function getRand(min, max) {
+			return Math.floor(Math.random() * (max - min) ) + min;
+		}
+
+		//get a string for the name of a color
+		function getColorName(hexColor) {
+			switch(hexColor) {
+				case 16711680:
+					return "red";
+				case 65280:
+					return "green";
+				case 255:
+					return "blue";
+				case 65535:
+					return "cyan";
+				case 16776960:
+					return "yellow";
+				case 16711935:
+					return "magenta";
+				case 15040267:
+					return "orange";
+				default:
+					return "default";
+			}
+		}
+	</script>
+	<script>
+		//check for webgl browser support
+		var testCanvas = document.createElement("canvas");
+		var glSupport = testCanvas.getContext("webgl") ||
+			testCanvas.getContext("experimental-webgl");
+			
+		if(glSupport && glSupport instanceof WebGLRenderingContext) {
+			init(); //intialize the game.
+		} else {
+			alert("It seems that your browser does not support WebGL." +  
+			"Please update your browser or switch to another one.");
+		}		
+	</script>
+</body>
+</html>
+	
