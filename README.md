@@ -1,5 +1,5 @@
 # game-component
-As part of the capstone for my degree, I collaborated on a project with two other team members to create a fully browser based game. With some experience writing Javascript and using the three.js source code, I was able to contribute the game needed for the project. While my teammates were able to focus on the rest of the backend, I could focus on writing this script.
+As part of the capstone for my degree, I collaborated on a project with two other team members to create a fully browser based game. With some experience writing Javascript and using the three.js library, I was able to contribute the game needed for the project. While my teammates were able to focus on the rest of the backend, I could focus on writing the script and CSS in MIBGa_Game.html.
 
 # MIBGa_Game.html
 I faced a number of challenges creating the game, especially when sending the score data asynchronously to the server. What I wanted to have happen is:
